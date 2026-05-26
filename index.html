@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CircleCrop — Crop Gambar Profil Bulat</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0eef8;
+  --surface: #fff;
+  --primary: #6c4fd8;
+  --primary-light: #8b6fe8;
+  --primary-pale: #ede9ff;
+  --accent: #ff6b9d;
+  --text: #1a1630;
+  --muted: #7c7a90;
+  --border: #e0ddf0;
+  --radius: 20px;
+  --shadow: 0 8px 32px rgba(108,79,216,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 28px 16px 80px;
+  color: var(--text);
+}
+
+/* ── Header ── */
+.header { text-align: center; margin-bottom: 32px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--primary-pale); color: var(--primary);
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; padding: 5px 14px; border-radius: 100px; margin-bottom: 12px;
+}
+.header h1 { font-size: clamp(24px,5vw,40px); font-weight: 800; letter-spacing: -1px; line-height: 1.1; margin-bottom: 8px; }
+.header h1 span { color: var(--primary); }
+.header p { color: var(--muted); font-size: 14px; max-width: 400px; margin: 0 auto; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); width: 100%; max-width: 660px; overflow: hidden;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Upload Zone ── */
+.upload-zone { padding: 32px; border-bottom: 1px solid var(--border); }
+.dropzone {
+  border: 2.5px dashed var(--border); border-radius: 14px;
+  padding: 36px 24px; text-align: center; cursor: pointer;
+  transition: all 0.25s; background: var(--bg); position: relative;
+}
+.dropzone:hover, .dropzone.drag-over { border-color: var(--primary); background: var(--primary-pale); }
+.dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dropzone .dz-icon { width: 52px; height: 52px; background: var(--primary-pale); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 22px; }
+.dropzone h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.dropzone p { font-size: 13px; color: var(--muted); }
+.tip { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: center; }
+.tip span { color: var(--primary); font-weight: 700; }
+
+/* ── Editor ── */
+.editor-section { display: none; padding: 24px 32px; border-bottom: 1px solid var(--border); }
+.editor-section.visible { display: block; }
+.section-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 12px; }
+
+/* Canvas */
+.canvas-outer {
+  display: flex; justify-content: center; margin-bottom: 20px;
+}
+.canvas-wrap {
+  position: relative; width: 280px; height: 280px;
+  border-radius: 50%; overflow: hidden;
+  box-shadow: 0 0 0 4px var(--primary), 0 0 0 8px var(--primary-pale);
+  cursor: grab; user-select: none; background: #e8e5f4;
+}
+.canvas-wrap:active { cursor: grabbing; }
+.canvas-wrap canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+/* border overlay canvas */
+.canvas-wrap .border-canvas {
+  position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; display: block; width: 100%; height: 100%;
+}
+
+/* Controls grid */
+.ctrl-grid { display: flex; flex-direction: column; gap: 12px; }
+.ctrl-row { display: flex; align-items: center; gap: 10px; }
+.ctrl-row label { font-size: 12px; font-weight: 700; min-width: 68px; color: var(--text); }
+.ctrl-row input[type="range"] { flex: 1; accent-color: var(--primary); height: 4px; cursor: pointer; }
+.ctrl-val { font-size: 12px; font-weight: 700; color: var(--primary); min-width: 44px; text-align: right; }
+
+/* Size row */
+.size-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.size-btn {
+  flex: 1; min-width: 64px; padding: 8px 4px;
+  border: 2px solid var(--border); border-radius: 10px;
+  font-size: 12px; font-weight: 700; font-family: inherit;
+  background: var(--bg); cursor: pointer; transition: all 0.2s; text-align: center; color: var(--text);
+}
+.size-btn:hover { border-color: var(--primary); color: var(--primary); }
+.size-btn.active { border-color: var(--primary); background: var(--primary-pale); color: var(--primary); }
+
+/* ── Feature Panels ── */
+.feat-panels { border-top: 1px solid var(--border); }
+.feat-section { border-bottom: 1px solid var(--border); }
+.feat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; cursor: pointer; user-select: none; transition: background 0.2s;
+}
+.feat-header:hover { background: var(--bg); }
+.feat-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.feat-arrow { font-size: 11px; color: var(--muted); transition: transform 0.25s; }
+.feat-body { display: none; padding: 0 32px 20px; }
+.feat-section.open .feat-arrow { transform: rotate(180deg); }
+.feat-section.open .feat-body { display: block; }
+
+/* Filter grid */
+.filter-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 2.5px solid var(--border); border-radius: 12px;
+  padding: 8px 10px; cursor: pointer; transition: all 0.2s;
+  background: var(--bg); font-family: inherit;
+}
+.filter-btn:hover { border-color: var(--primary); }
+.filter-btn.active { border-color: var(--primary); background: var(--primary-pale); }
+.filter-thumb {
+  width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+  background: #ccc; flex-shrink: 0;
+}
+.filter-thumb canvas { width: 100%; height: 100%; display: block; }
+.filter-btn span { font-size: 11px; font-weight: 700; color: var(--text); }
+.filter-btn.active span { color: var(--primary); }
+
+/* Border controls */
+.border-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.border-row label { font-size: 12px; font-weight: 700; min-width: 60px; }
+.color-swatch {
+  width: 32px; height: 32px; border-radius: 8px; border: 2px solid var(--border);
+  cursor: pointer; overflow: hidden; position: relative; flex-shrink: 0;
+}
+.color-swatch input[type="color"] { position: absolute; inset: -4px; opacity: 0; cursor: pointer; width: 140%; height: 140%; }
+.swatch-preview { width: 100%; height: 100%; border-radius: 6px; }
+
+/* Border style pills */
+.bstyle-row { display: flex; gap: 6px; }
+.bstyle-btn {
+  padding: 5px 12px; border: 2px solid var(--border); border-radius: 100px;
+  font-size: 11px; font-weight: 700; font-family: inherit; background: var(--bg);
+  cursor: pointer; transition: all 0.2s; color: var(--muted);
+}
+.bstyle-btn.active { border-color: var(--primary); background: var(--primary-pale); color: var(--primary); }
+
+/* ── Actions ── */
+.actions { padding: 20px 32px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  flex: 1; min-width: 110px; padding: 13px 16px;
+  border-radius: 100px; font-size: 13px; font-weight: 700;
+  font-family: inherit; cursor: pointer; border: none;
+  transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 16px rgba(108,79,216,0.3); }
+.btn-primary:hover { background: var(--primary-light); transform: translateY(-1px); }
+.btn-secondary { background: var(--bg); color: var(--text); border: 2px solid var(--border); }
+.btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+.btn-accent { background: var(--accent); color: #fff; box-shadow: 0 4px 16px rgba(255,107,157,0.3); }
+.btn-accent:hover { background: #ff4d8d; transform: translateY(-1px); }
+.btn-green { background: var(--green); color: #fff; box-shadow: 0 4px 16px rgba(34,197,94,0.25); }
+.btn-green:hover { background: #16a34a; transform: translateY(-1px); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+/* ── Preview Strip ── */
+.preview-strip { padding: 20px 32px; border-top: 1px solid var(--border); display: none; }
+.preview-strip.visible { display: block; }
+.preview-sizes { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.preview-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.preview-item span { font-size: 10px; font-weight: 700; color: var(--muted); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--text); color: #fff; padding: 11px 22px;
+  border-radius: 100px; font-size: 13px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  z-index: 999; pointer-events: none; white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin 0.8s linear infinite; }
+
+@media (max-width: 480px) {
+  .actions, .editor-section, .upload-zone, .batch-queue, .feat-body { padding-left: 20px; padding-right: 20px; }
+  .feat-header { padding-left: 20px; padding-right: 20px; }
+  .canvas-wrap { width: 230px; height: 230px; }
+  .preview-strip { padding: 16px 20px; }
+  .batch-bar { padding: 14px 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">✦ CircleCrop</div>
+  <h1>Circle<span>Crop</span></h1>
+  <p>Crop, filter, border & buang latar — satu tool untuk semua platform profil.</p>
+</div>
+
+<div class="card">
+
+
+
+    <!-- Upload -->
+    <div class="upload-zone">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept="image/*">
+        <div class="dz-icon">🖼️</div>
+        <h3>Lepaskan gambar di sini</h3>
+        <p>atau klik untuk pilih dari peranti anda</p>
+      </div>
+      <p class="tip">Sokong: <span>JPG, PNG, WEBP</span> · Seret = alih · Scroll = zum</p>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-section" id="editorSection">
+      <div class="section-label">✦ Laraskan Crop</div>
+
+      <!-- Canvas -->
+      <div class="canvas-outer">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="cropCanvas"></canvas>
+          <canvas id="borderCanvas" class="border-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="ctrl-grid">
+        <div class="ctrl-row">
+          <label>🔍 Zum</label>
+          <input type="range" id="zoomRange" min="0.1" max="6" step="0.01" value="1">
+          <span class="ctrl-val" id="zoomVal">100%</span>
+        </div>
+        <div class="ctrl-row">
+          <label>🔄 Putar</label>
+          <input type="range" id="rotRange" min="-180" max="180" step="1" value="0">
+          <span class="ctrl-val" id="rotVal">0°</span>
+        </div>
+      </div>
+
+      <!-- Output size -->
+      <div style="margin-top:14px;">
+        <div class="section-label">📐 Saiz Output</div>
+        <div class="size-row" id="sizeRow">
+          <button class="size-btn active" data-size="400">400px</button>
+          <button class="size-btn" data-size="512">512px</button>
+          <button class="size-btn" data-size="800">800px</button>
+          <button class="size-btn" data-size="1000">1000px</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Accordions -->
+    <div class="feat-panels" id="featPanels" style="display:none;">
+
+      <!-- Filter Warna -->
+      <div class="feat-section" id="fsFilter">
+        <div class="feat-header" onclick="toggleFeat('fsFilter')">
+          <span class="feat-title">🎨 Filter Warna</span>
+          <span class="feat-arrow">▼</span>
+        </div>
+        <div class="feat-body">
+          <div class="filter-grid" id="filterGrid"></div>
+        </div>
+      </div>
+
+      <!-- Border -->
+      <div class="feat-section" id="fsBorder">
+        <div class="feat-header" onclick="toggleFeat('fsBorder')">
+          <span class="feat-title">🔵 Border / Bingkai</span>
+          <span class="feat-arrow">▼</span>
+        </div>
+        <div class="feat-body">
+          <div class="border-row">
+            <label>Tebal</label>
+            <input type="range" id="borderWidth" min="0" max="40" step="1" value="0" style="flex:1;accent-color:var(--primary);">
+            <span class="ctrl-val" id="borderWidthVal">0px</span>
+          </div>
+          <div class="border-row">
+            <label>Warna</label>
+            <div class="color-swatch">
+              <div class="swatch-preview" id="swatchPreview" style="background:#6c4fd8;"></div>
+              <input type="color" id="borderColor" value="#6c4fd8">
+            </div>
+            <div class="bstyle-row">
+              <button class="bstyle-btn active" data-style="solid">Solid</button>
+              <button class="bstyle-btn" data-style="dashed">Putus</button>
+              <button class="bstyle-btn" data-style="gradient">Gradien</button>
+            </div>
+          </div>
+          <!-- Gradient second colour -->
+          <div class="border-row" id="grad2Row" style="display:none;">
+            <label>Warna 2</label>
+            <div class="color-swatch">
+              <div class="swatch-preview" id="swatchPreview2" style="background:#ff6b9d;"></div>
+              <input type="color" id="borderColor2" value="#ff6b9d">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /feat-panels -->
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-secondary" id="btnReset">↺ Reset</button>
+      <button class="btn btn-primary" id="btnCopy" disabled>📋 Salin</button>
+      <button class="btn btn-accent" id="btnSave" disabled>💾 Simpan PNG</button>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-strip" id="previewStrip">
+      <div class="section-label">✦ Pratonton Saiz</div>
+      <div class="preview-sizes" id="previewSizes"></div>
+    </div>
+
+
+
+
+
+</div><!-- /card -->
+<!-- Footer -->
+<footer style="margin-top:24px;text-align:center;padding:16px 0 4px;">
+  <a href="https://mrsyahwork.com" target="_blank" rel="noopener"
+     style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+            color:#7c7a90;font-size:13px;font-weight:600;transition:color 0.2s;"
+     onmouseover="this.style.color='#6c4fd8'" onmouseout="this.style.color='#7c7a90'">
+    <span style="font-size:16px;">✦</span> By <strong style="color:#6c4fd8;">Mr.Syah</strong>
+  </a>
+</footer>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONSTANTS & STATE
+// ═══════════════════════════════════════════════════════
+const CANVAS_RES = 600;
+let prevThrottle, toastTimerRef;
+
+const state = {
+  img: null,
+  zoom: 1, rot: 0, offsetX: 0, offsetY: 0,
+  dragging: false, lastX: 0, lastY: 0,
+  lastDist: null, lastAngle: null,
+  outputSize: 400,
+  _scaleFit: 1, _scaleFill: 1,
+  filter: 'none',
+  borderWidth: 0, borderColor: '#6c4fd8', borderColor2: '#ff6b9d', borderStyle: 'solid',
+  fillMode: 'transparent', fillColor: '#ede9ff',
+};
+
+// ═══════════════════════════════════════════════════════
+// ELEMENTS
+// ═══════════════════════════════════════════════════════
+const fileInput     = document.getElementById('fileInput');
+const dropzone      = document.getElementById('dropzone');
+const editorSection = document.getElementById('editorSection');
+const featPanels    = document.getElementById('featPanels');
+const canvasWrap    = document.getElementById('canvasWrap');
+const cropCanvas    = document.getElementById('cropCanvas');
+const borderCanvas  = document.getElementById('borderCanvas');
+const ctx           = cropCanvas.getContext('2d');
+const bctx          = borderCanvas.getContext('2d');
+const zoomRange     = document.getElementById('zoomRange');
+const rotRange      = document.getElementById('rotRange');
+const zoomVal       = document.getElementById('zoomVal');
+const rotVal        = document.getElementById('rotVal');
+const btnSave       = document.getElementById('btnSave');
+const btnCopy       = document.getElementById('btnCopy');
+const btnReset      = document.getElementById('btnReset');
+const previewStrip  = document.getElementById('previewStrip');
+const previewSizes  = document.getElementById('previewSizes');
+const toast         = document.getElementById('toast');
+
+cropCanvas.width  = borderCanvas.width  = CANVAS_RES;
+cropCanvas.height = borderCanvas.height = CANVAS_RES;
+
+// ═══════════════════════════════════════════════════════
+// LOAD IMAGE (single)
+// ═══════════════════════════════════════════════════════
+function loadImage(file) {
+  if (!file || !file.type.startsWith('image/')) { showToast('❌ Fail tidak disokong'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      state.img = img;
+      initTransform(img);
+      editorSection.classList.add('visible');
+      featPanels.style.display = '';
+      btnSave.disabled = btnCopy.disabled = false;
+      draw(); drawBorder(); buildPreviews(); buildFilterThumbs();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function initTransform(img) {
+  const fit  = Math.min(CANVAS_RES / img.width, CANVAS_RES / img.height);
+  const fill = Math.max(CANVAS_RES / img.width, CANVAS_RES / img.height);
+  state._scaleFit  = fit;
+  state._scaleFill = fill;
+  state.zoom    = fill; // default fill
+  state.offsetX = 0; state.offsetY = 0; state.rot = 0;
+  zoomRange.min   = Math.max(0.05, fit * 0.4);
+  zoomRange.value = state.zoom;
+  rotRange.value  = 0;
+  zoomVal.textContent = Math.round(state.zoom * 100) + '%';
+  rotVal.textContent  = '0°';
+}
+
+fileInput.addEventListener('change', () => loadImage(fileInput.files[0]));
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag-over'); loadImage(e.dataTransfer.files[0]); });
+
+// ═══════════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════════
+function activeImg() { return state.img; }
+
+function draw() {
+  if (!activeImg()) return;
+  const img = activeImg();
+  const c = CANVAS_RES / 2;
+  ctx.clearRect(0, 0, CANVAS_RES, CANVAS_RES);
+
+  // fill background if chosen
+  if (state.fillMode !== 'transparent') {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(c, c, c, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = state.fillMode === 'custom' ? state.fillColor
+                  : state.fillMode === 'white'  ? '#ffffff' : '#000000';
+    ctx.fillRect(0, 0, CANVAS_RES, CANVAS_RES);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(c, c, c, 0, Math.PI * 2); ctx.clip();
+  ctx.translate(c + state.offsetX, c + state.offsetY);
+  ctx.rotate(state.rot * Math.PI / 180);
+  ctx.scale(state.zoom, state.zoom);
+  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  ctx.restore();
+
+  applyFilter();
+}
+
+function applyFilter() {
+  if (state.filter === 'none') return;
+  const imgData = ctx.getImageData(0, 0, CANVAS_RES, CANVAS_RES);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i+1], b = d[i+2];
+    if (state.filter === 'bw') {
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      d[i] = d[i+1] = d[i+2] = lum;
+    } else if (state.filter === 'sepia') {
+      d[i]   = Math.min(255, r*0.393 + g*0.769 + b*0.189);
+      d[i+1] = Math.min(255, r*0.349 + g*0.686 + b*0.168);
+      d[i+2] = Math.min(255, r*0.272 + g*0.534 + b*0.131);
+    } else if (state.filter === 'warm') {
+      d[i]   = Math.min(255, r * 1.15);
+      d[i+1] = Math.min(255, g * 1.05);
+      d[i+2] = Math.max(0,   b * 0.85);
+    } else if (state.filter === 'cool') {
+      d[i]   = Math.max(0,   r * 0.85);
+      d[i+1] = Math.min(255, g * 1.05);
+      d[i+2] = Math.min(255, b * 1.2);
+    } else if (state.filter === 'vivid') {
+      d[i]   = Math.min(255, (r - 128) * 1.4 + 128);
+      d[i+1] = Math.min(255, (g - 128) * 1.4 + 128);
+      d[i+2] = Math.min(255, (b - 128) * 1.4 + 128);
+    } else if (state.filter === 'fade') {
+      d[i]   = r * 0.7 + 50;
+      d[i+1] = g * 0.7 + 50;
+      d[i+2] = b * 0.7 + 50;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════
+// BORDER CANVAS
+// ═══════════════════════════════════════════════════════
+function drawBorder() {
+  bctx.clearRect(0, 0, CANVAS_RES, CANVAS_RES);
+  const w = state.borderWidth;
+  if (w <= 0) return;
+  const c = CANVAS_RES / 2;
+  const r = c - w / 2;
+
+  if (state.borderStyle === 'gradient') {
+    const grad = bctx.createLinearGradient(0, 0, CANVAS_RES, CANVAS_RES);
+    grad.addColorStop(0, state.borderColor);
+    grad.addColorStop(1, state.borderColor2);
+    bctx.strokeStyle = grad;
+    bctx.setLineDash([]);
+  } else if (state.borderStyle === 'dashed') {
+    bctx.strokeStyle = state.borderColor;
+    bctx.setLineDash([w * 2, w]);
+  } else {
+    bctx.strokeStyle = state.borderColor;
+    bctx.setLineDash([]);
+  }
+  bctx.lineWidth = w;
+  bctx.beginPath();
+  bctx.arc(c, c, r, 0, Math.PI * 2);
+  bctx.stroke();
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER FINAL (crop + filter + border merged)
+// ═══════════════════════════════════════════════════════
+function renderFinal(size) {
+  const oc  = document.createElement('canvas');
+  oc.width  = oc.height = size;
+  const ox  = oc.getContext('2d');
+  const c   = size / 2;
+  const sf  = size / CANVAS_RES;
+  const img = activeImg();
+
+  // Background
+  if (state.fillMode !== 'transparent') {
+    ox.save();
+    ox.beginPath(); ox.arc(c, c, c, 0, Math.PI * 2); ox.clip();
+    ox.fillStyle = state.fillMode === 'custom' ? state.fillColor
+                 : state.fillMode === 'white'  ? '#ffffff' : '#000000';
+    ox.fillRect(0, 0, size, size);
+    ox.restore();
+  }
+
+  // Image
+  ox.save();
+  ox.beginPath(); ox.arc(c, c, c, 0, Math.PI * 2); ox.clip();
+  ox.translate(c + state.offsetX * sf, c + state.offsetY * sf);
+  ox.rotate(state.rot * Math.PI / 180);
+  ox.scale(state.zoom * sf, state.zoom * sf);
+  ox.drawImage(img, -img.width / 2, -img.height / 2);
+  ox.restore();
+
+  // Filter
+  if (state.filter !== 'none') {
+    const imgData = ox.getImageData(0, 0, size, size);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i], g = d[i+1], b = d[i+2];
+      if (state.filter === 'bw') { const lum = 0.299*r+0.587*g+0.114*b; d[i]=d[i+1]=d[i+2]=lum; }
+      else if (state.filter === 'sepia') { d[i]=Math.min(255,r*.393+g*.769+b*.189); d[i+1]=Math.min(255,r*.349+g*.686+b*.168); d[i+2]=Math.min(255,r*.272+g*.534+b*.131); }
+      else if (state.filter === 'warm')  { d[i]=Math.min(255,r*1.15); d[i+1]=Math.min(255,g*1.05); d[i+2]=Math.max(0,b*.85); }
+      else if (state.filter === 'cool')  { d[i]=Math.max(0,r*.85); d[i+1]=Math.min(255,g*1.05); d[i+2]=Math.min(255,b*1.2); }
+      else if (state.filter === 'vivid') { d[i]=Math.min(255,(r-128)*1.4+128); d[i+1]=Math.min(255,(g-128)*1.4+128); d[i+2]=Math.min(255,(b-128)*1.4+128); }
+      else if (state.filter === 'fade')  { d[i]=r*.7+50; d[i+1]=g*.7+50; d[i+2]=b*.7+50; }
+    }
+    ox.putImageData(imgData, 0, 0);
+  }
+
+  // Border
+  const bw = state.borderWidth * sf;
+  if (bw > 0) {
+    const br = c - bw / 2;
+    if (state.borderStyle === 'gradient') {
+      const grad = ox.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, state.borderColor); grad.addColorStop(1, state.borderColor2);
+      ox.strokeStyle = grad; ox.setLineDash([]);
+    } else if (state.borderStyle === 'dashed') {
+      ox.strokeStyle = state.borderColor; ox.setLineDash([bw * 2, bw]);
+    } else {
+      ox.strokeStyle = state.borderColor; ox.setLineDash([]);
+    }
+    ox.lineWidth = bw;
+    ox.beginPath(); ox.arc(c, c, br, 0, Math.PI * 2); ox.stroke();
+  }
+  return oc;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════
+zoomRange.addEventListener('input', () => {
+  state.zoom = parseFloat(zoomRange.value);
+  zoomVal.textContent = Math.round(state.zoom * 100) + '%';
+  draw(); drawBorder(); buildPreviews();
+});
+rotRange.addEventListener('input', () => {
+  state.rot = parseFloat(rotRange.value);
+  rotVal.textContent = state.rot + '°';
+  draw(); drawBorder(); buildPreviews();
+});
+
+// Size buttons
+document.getElementById('sizeRow').addEventListener('click', e => {
+  const btn = e.target.closest('.size-btn'); if (!btn) return;
+  document.querySelectorAll('#sizeRow .size-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.outputSize = parseInt(btn.dataset.size);
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.preset-btn').classList.add('active'); // reset to Tersuai
+});
+
+// ═══════════════════════════════════════════════════════
+// MOUSE/TOUCH DRAG
+// ═══════════════════════════════════════════════════════
+canvasWrap.addEventListener('mousedown', e => { state.dragging = true; state.lastX = e.clientX; state.lastY = e.clientY; });
+window.addEventListener('mousemove', e => {
+  if (!state.dragging) return;
+  const r = CANVAS_RES / canvasWrap.offsetWidth;
+  state.offsetX += (e.clientX - state.lastX) * r; state.offsetY += (e.clientY - state.lastY) * r;
+  state.lastX = e.clientX; state.lastY = e.clientY;
+  draw(); drawBorder(); buildPreviews();
+});
+window.addEventListener('mouseup', () => { state.dragging = false; });
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  state.zoom = Math.min(Math.max(state.zoom + (e.deltaY > 0 ? -0.05 : 0.05), 0.1), 6);
+  zoomRange.value = state.zoom; zoomVal.textContent = Math.round(state.zoom * 100) + '%';
+  draw(); drawBorder(); buildPreviews();
+}, { passive: false });
+canvasWrap.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { state.dragging = true; state.lastX = e.touches[0].clientX; state.lastY = e.touches[0].clientY; state.lastDist = null; state.lastAngle = null; }
+  else if (e.touches.length === 2) { state.dragging = false; state.lastDist = tDist(e.touches); state.lastAngle = tAngle(e.touches); }
+}, { passive: true });
+canvasWrap.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const r = CANVAS_RES / canvasWrap.offsetWidth;
+  if (e.touches.length === 1 && state.dragging) {
+    state.offsetX += (e.touches[0].clientX - state.lastX) * r; state.offsetY += (e.touches[0].clientY - state.lastY) * r;
+    state.lastX = e.touches[0].clientX; state.lastY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    const d = tDist(e.touches);
+    if (state.lastDist) { state.zoom = Math.min(Math.max(state.zoom * d / state.lastDist, 0.1), 6); zoomRange.value = state.zoom; zoomVal.textContent = Math.round(state.zoom * 100) + '%'; }
+    state.lastDist = d;
+    const a = tAngle(e.touches);
+    if (state.lastAngle != null) { state.rot = Math.max(-180, Math.min(180, state.rot + (a - state.lastAngle) * 180 / Math.PI)); rotRange.value = Math.round(state.rot); rotVal.textContent = Math.round(state.rot) + '°'; }
+    state.lastAngle = a;
+  }
+  draw(); drawBorder(); buildPreviews();
+}, { passive: false });
+canvasWrap.addEventListener('touchend', () => { state.dragging = false; state.lastDist = null; state.lastAngle = null; });
+const tDist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+const tAngle = t => Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX);
+
+// ═══════════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════════
+const FILTERS = [
+  { id: 'none',  label: 'Asal' },
+  { id: 'bw',    label: 'B&W' },
+  { id: 'sepia', label: 'Sepia' },
+  { id: 'warm',  label: 'Warm' },
+  { id: 'cool',  label: 'Cool' },
+  { id: 'vivid', label: 'Vivid' },
+  { id: 'fade',  label: 'Fade' },
+];
+
+function buildFilterThumbs() {
+  const grid = document.getElementById('filterGrid');
+  grid.innerHTML = '';
+  FILTERS.forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (f.id === state.filter ? ' active' : '');
+    btn.dataset.filter = f.id;
+
+    const thumb = document.createElement('div');
+    thumb.className = 'filter-thumb';
+    const tc = document.createElement('canvas');
+    tc.width = tc.height = 52;
+    // render tiny thumb with filter
+    const tx = tc.getContext('2d');
+    const img = activeImg();
+    const scale = Math.max(52 / img.width, 52 / img.height);
+    tx.save();
+    tx.beginPath(); tx.arc(26, 26, 26, 0, Math.PI * 2); tx.clip();
+    tx.translate(26, 26); tx.scale(scale, scale);
+    tx.drawImage(img, -img.width / 2, -img.height / 2);
+    tx.restore();
+    // apply filter to thumb
+    if (f.id !== 'none') {
+      const id = tx.getImageData(0, 0, 52, 52); const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        if (f.id==='bw'){const l=.299*r+.587*g+.114*b;d[i]=d[i+1]=d[i+2]=l;}
+        else if(f.id==='sepia'){d[i]=Math.min(255,r*.393+g*.769+b*.189);d[i+1]=Math.min(255,r*.349+g*.686+b*.168);d[i+2]=Math.min(255,r*.272+g*.534+b*.131);}
+        else if(f.id==='warm'){d[i]=Math.min(255,r*1.15);d[i+1]=Math.min(255,g*1.05);d[i+2]=Math.max(0,b*.85);}
+        else if(f.id==='cool'){d[i]=Math.max(0,r*.85);d[i+1]=Math.min(255,g*1.05);d[i+2]=Math.min(255,b*1.2);}
+        else if(f.id==='vivid'){d[i]=Math.min(255,(r-128)*1.4+128);d[i+1]=Math.min(255,(g-128)*1.4+128);d[i+2]=Math.min(255,(b-128)*1.4+128);}
+        else if(f.id==='fade'){d[i]=r*.7+50;d[i+1]=g*.7+50;d[i+2]=b*.7+50;}
+      }
+      tx.putImageData(id, 0, 0);
+    }
+    thumb.appendChild(tc);
+    const lbl = document.createElement('span'); lbl.textContent = f.label;
+    btn.appendChild(thumb); btn.appendChild(lbl);
+    btn.addEventListener('click', () => {
+      state.filter = f.id;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      draw(); drawBorder(); buildPreviews();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// BORDER
+// ═══════════════════════════════════════════════════════
+document.getElementById('borderWidth').addEventListener('input', e => {
+  state.borderWidth = parseInt(e.target.value);
+  document.getElementById('borderWidthVal').textContent = state.borderWidth + 'px';
+  drawBorder(); buildPreviews();
+});
+document.getElementById('borderColor').addEventListener('input', e => {
+  state.borderColor = e.target.value;
+  document.getElementById('swatchPreview').style.background = e.target.value;
+  drawBorder(); buildPreviews();
+});
+document.getElementById('borderColor2').addEventListener('input', e => {
+  state.borderColor2 = e.target.value;
+  document.getElementById('swatchPreview2').style.background = e.target.value;
+  drawBorder(); buildPreviews();
+});
+document.querySelectorAll('.bstyle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.bstyle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.borderStyle = btn.dataset.style;
+    document.getElementById('grad2Row').style.display = state.borderStyle === 'gradient' ? 'flex' : 'none';
+    drawBorder(); buildPreviews();
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// BACKGROUND FILL OPTIONS
+// ═══════════════════════════════════════════════════════
+// fill-opt listeners removed (bg remover section removed)
+
+// ═══════════════════════════════════════════════════════
+// FEAT ACCORDION
+// ═══════════════════════════════════════════════════════
+function toggleFeat(id) {
+  const el = document.getElementById(id);
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.feat-section').forEach(s => s.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+
+// ═══════════════════════════════════════════════════════
+// SAVE / COPY
+// ═══════════════════════════════════════════════════════
+btnSave.addEventListener('click', () => {
+  if (!activeImg()) return;
+  const oc = renderFinal(state.outputSize);
+  const link = document.createElement('a');
+  link.download = 'profil-bulat-' + state.outputSize + 'px.png';
+  link.href = oc.toDataURL('image/png'); link.click();
+  showToast('✅ Disimpan!');
+});
+
+btnCopy.addEventListener('click', async () => {
+  if (!activeImg()) return;
+  try {
+    renderFinal(state.outputSize).toBlob(async blob => {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      showToast('📋 Disalin ke clipboard!');
+    }, 'image/png');
+  } catch { showToast('❌ Clipboard tidak disokong'); }
+});
+
+btnReset.addEventListener('click', () => {
+  fileInput.value = ''; state.img = null;
+  state.filter = 'none'; state.borderWidth = 0;
+  document.getElementById('borderWidth').value = 0;
+  document.getElementById('borderWidthVal').textContent = '0px';
+  editorSection.classList.remove('visible');
+  featPanels.style.display = 'none';
+  previewStrip.classList.remove('visible');
+  btnSave.disabled = btnCopy.disabled = true;
+  ctx.clearRect(0, 0, CANVAS_RES, CANVAS_RES);
+  bctx.clearRect(0, 0, CANVAS_RES, CANVAS_RES);
+  showToast('🔄 Diset semula');
+});
+
+// ═══════════════════════════════════════════════════════
+// PREVIEWS
+// ═══════════════════════════════════════════════════════
+function buildPreviews() {
+  clearTimeout(prevThrottle);
+  prevThrottle = setTimeout(() => {
+    if (!activeImg()) return;
+    previewStrip.classList.add('visible');
+    previewSizes.innerHTML = '';
+    [
+      { output: 32,  display: 32  },
+      { output: 64,  display: 64  },
+      { output: 128, display: 128 },
+      { output: state.outputSize, display: 150, label: state.outputSize + 'px ★' },
+    ].forEach(({ output, display, label }) => {
+      const oc = renderFinal(output);
+      oc.style.cssText = `width:${display}px;height:${display}px;border-radius:50%;box-shadow:0 3px 10px rgba(108,79,216,0.15);display:block;`;
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.appendChild(oc);
+      const lbl = document.createElement('span');
+      lbl.textContent = label || output + 'px';
+      item.appendChild(lbl);
+      previewSizes.appendChild(item);
+    });
+  }, 80);
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+function showToast(msg) {
+  toast.textContent = msg; toast.classList.add('show');
+  clearTimeout(toastTimerRef);
+  toastTimerRef = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
